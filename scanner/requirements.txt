@@ -1,0 +1,11 @@
+fastapi==0.115.0
+uvicorn==0.32.0
+pydantic==2.9.2
+pydantic-settings==2.6.1
+cryptography>=41.0.5,<43
+pyOpenSSL==24.1.0
+# pyjks==20.0.0  # Requires MSVC build tools, optional for MVP
+cyclonedx-python-lib==9.1.0
+# tree-sitter==0.23.0
+# tree-sitter-languages==1.9.0
+python-dotenv==1.0.1
