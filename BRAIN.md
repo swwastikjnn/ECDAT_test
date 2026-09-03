@@ -34,10 +34,10 @@ One-line pitch: "We find your broken crypto before quantum computers do."
 ## CURRENT STATE
 
 ```
-Last updated:        2026-08-27
-Last thing done:     M0 Scaffold + Hello World complete - all three services scaffolded
-Currently broken:    Need to install dependencies and test
-Next thing to do:    Install Python deps, install Node deps, start services, run contract test
+Last updated:        2026-09-01
+Last thing done:     Fixed 3 scanner bugs: TLSv1/SSLv3 classification, comment false-positives, bare-call detection gap
+Currently broken:    Node.js not installed on this machine (backend untested), Python scanner fully working
+Next thing to do:    Install Node.js, set up MongoDB Atlas, run backend, test full stack
 ```
 
 ### Milestone Status
@@ -47,8 +47,25 @@ M1 — Source Scanner (regex):         [x] COMPLETE
 M2 — Certificate Scanner:            [x] COMPLETE
 M3 — Risk + Recommendation Engine:   [x] COMPLETE
 M4 — CBOM Output:                    [x] COMPLETE
-M5 — Node Backend + MongoDB:         [x] COMPLETE
-M6 — Frontend (6 pages):             [x] COMPLETE
+M5 — Node Backend + MongoDB:         [~] SCAFFOLDED (Node.js not installed)
+M6 — Frontend (6 pages):             [x] COMPLETE (single HTML file)
+```
+
+### Recent Bug Fixes (2026-09-01)
+```
+BUG 1 — scanner/risk/classify.py (Krish):
+  Added TLSV1/SSLV3 to QUANTUM_VULNERABILITY dict → "critical"
+  Fixes: deprecated TLS/SSL were silently downgraded to "medium"
+
+BUG 2 — scanner/detectors/source_scanner.py (Divay):
+  Skip comment lines before regex matching per language:
+    Python: #..., Java/C/C++/JS/TS: //, /*, *
+  Fixes: false positives from comments/docstrings
+
+BUG 3 — scanner/detectors/rules.py (Divay):
+  Added bare-call patterns for pycryptodome idiomatic usage:
+    DES.new(), AES.new(), ARC4.new(), RSA.generate(), RSA.import_key(), ECC.generate()
+  Fixes: scanner missed imports like "from Crypto.Cipher import DES" + bare "DES.new()"
 ```
 Change [ ] to [x] when complete. Change to [~] if in progress.
 
