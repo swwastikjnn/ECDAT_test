@@ -12,6 +12,11 @@ SOURCE_DETECTION_RULES = {
         {"pattern": r"hashlib\.sha1\(", "algorithm": "SHA-1", "risk": "critical"},
         {"pattern": r"ssl\.PROTOCOL_TLSv1", "algorithm": "TLSv1", "risk": "critical"},
         {"pattern": r"ssl\.PROTOCOL_SSLv3", "algorithm": "SSLv3", "risk": "critical"},
+        {"pattern": r"\bDES\.new\(", "algorithm": "DES", "risk": "critical"},
+        {"pattern": r"\bAES\.new\(", "algorithm": "AES", "risk": "medium"},
+        {"pattern": r"\bARC4\.new\(", "algorithm": "RC4", "risk": "critical"},
+        {"pattern": r"\bRSA\.(generate|import_key)\(", "algorithm": "RSA", "risk": "critical"},
+        {"pattern": r"\bECC\.generate\(", "algorithm": "ECC", "risk": "critical"},
     ],
     "java": [
         {"pattern": r'Cipher\.getInstance\("RSA', "algorithm": "RSA", "risk": "critical"},

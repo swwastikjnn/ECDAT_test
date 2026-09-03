@@ -26,6 +26,13 @@ def scan_file_content(file_path: str, content: str, language: str) -> List[Dict[
     rules = SOURCE_DETECTION_RULES.get(language, [])
     lines = content.split("\n")
     for line_num, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if language == "python":
+            if stripped.startswith("#"):
+                continue
+        elif language in ("java", "c", "cpp", "javascript", "typescript"):
+            if stripped.startswith(("//", "/*", "*")):
+                continue
         for rule in rules:
             if re.search(rule["pattern"], line):
                 findings.append({

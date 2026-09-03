@@ -12,6 +12,8 @@ QUANTUM_VULNERABILITY = {
     "DES": "critical",
     "3DES": "critical",
     "RC4": "critical",
+    "TLSV1": "critical",
+    "SSLV3": "critical",
     "AES-128": "medium",
     "SHA-256": "medium",
     "SHA256": "medium",
