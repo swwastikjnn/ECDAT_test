@@ -30,13 +30,16 @@ router.post("/", upload.single("zipFile"), async (req, res) => {
   try {
     const { projectName, targetType, sourceRef } = req.body;
     let targetPath = sourceRef;
-
     if (targetType === "zip" && req.file) {
       const extractDir = `uploads/extracted_${Date.now()}`;
       fs.mkdirSync(extractDir, { recursive: true });
       const zip = new AdmZip(req.file.path);
       zip.extractAllTo(extractDir, true);
       targetPath = extractDir;
+    }
+
+    if (targetType === "zip" && !req.file) {
+      return sendResponse(res, false, null, "No zip file uploaded", 400);
     }
 
     const scan = new Scan({
@@ -57,7 +60,7 @@ router.post("/", upload.single("zipFile"), async (req, res) => {
       weight_expiry: settings.weightExpiry
     };
 
-    const scannerResult = await callScanner(targetPath, scannerSettings);
+    const scannerResult = await callScanner(req.file.path, scannerSettings);
 
     const assets = scannerResult.assets.map(a => ({
       scanId: scan._id,
