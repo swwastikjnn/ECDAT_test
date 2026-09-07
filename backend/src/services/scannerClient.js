@@ -1,14 +1,24 @@
 const axios = require("axios");
+const fs = require("fs");
+const FormData = require("form-data"); // npm install form-data if not already present
 
 const SCANNER_URL = process.env.SCANNER_URL || "http://localhost:8000";
 
-async function callScanner(targetPath, settings = {}) {
+async function callScanner(zipFilePath, settings = {}) {
   try {
-    const response = await axios.post(`${SCANNER_URL}/scan`, {
-      target_path: targetPath,
-      ...settings
-    }, {
-      timeout: 300000
+    const form = new FormData();
+    form.append("file", fs.createReadStream(zipFilePath));
+    form.append("z_years", settings.z_years ?? 10);
+    form.append("weight_quantum", settings.weight_quantum ?? 0.40);
+    form.append("weight_business", settings.weight_business ?? 0.30);
+    form.append("weight_mosca", settings.weight_mosca ?? 0.20);
+    form.append("weight_expiry", settings.weight_expiry ?? 0.10);
+
+    const response = await axios.post(`${SCANNER_URL}/scan`, form, {
+      headers: form.getHeaders(),
+      timeout: 300000,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity
     });
     return response.data;
   } catch (error) {
