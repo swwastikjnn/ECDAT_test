@@ -11,7 +11,7 @@ const settingsSchema = new mongoose.Schema({
   weightExpiry: { type: Number, default: 0.10 }
 });
 
-const Settings = mongoose.model("Settings", settingsSchema);
+const Settings = mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
 
 async function getSettings() {
   let settings = await Settings.findOne();
