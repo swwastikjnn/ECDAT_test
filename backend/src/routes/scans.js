@@ -12,15 +12,7 @@ const router = express.Router();
 
 const upload = multer({ dest: "uploads/" });
 
-const settingsSchema = new mongoose.Schema({
-  zAssumptionYears: { type: Number, default: 10 },
-  weightQuantum: { type: Number, default: 0.40 },
-  weightBusiness: { type: Number, default: 0.30 },
-  weightMosca: { type: Number, default: 0.20 },
-  weightExpiry: { type: Number, default: 0.10 }
-});
-
-const Settings = mongoose.model("Settings", settingsSchema);
+const Settings = require("../models/Settings");
 
 async function getSettings() {
   let settings = await Settings.findOne();
