@@ -1,592 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ECDAT — Cryptographic Bill of Materials</title>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-
-<style>
-  :root{
-    --ink:#0A1928;
-    --panel:#0F2338;
-    --panel-raised:#153552;
-    --line:#22415C;
-    --line-bright:#3E7099;
-    --paper:#E9F1F8;
-    --paper-dim:#8AA8C4;
-    --paper-faint:#5A7995;
-    --brass:#C9973F;
-    --brass-bright:#E7B968;
-    --critical:#DB6067;
-    --high:#DC9A52;
-    --medium:#5A9BCB;
-    --safe:#59A67E;
-    --radius:4px;
-  }
-
-  *{box-sizing:border-box;margin:0;padding:0;}
-
-  html{background:var(--ink);}
-
-  body{
-    min-height:100vh;
-    font-family:"Space Grotesk",-apple-system,BlinkMacSystemFont,sans-serif;
-    color:var(--paper);
-    background:
-      linear-gradient(var(--line) 1px, transparent 1px) 0 0/100% 34px,
-      linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0/34px 100%,
-      var(--ink);
-    background-blend-mode:overlay, overlay, normal;
-    opacity:1;
-  }
-  body::before{ }
-
-  /* faint grid via pseudo-layer so it stays subtle */
-  body{
-    background-image:
-      linear-gradient(rgba(62,112,153,0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(62,112,153,0.05) 1px, transparent 1px);
-    background-size:36px 36px;
-  }
-
-  button, input, select{font:inherit;color:inherit;}
-  button{cursor:pointer;background:none;border:none;}
-  a{color:inherit;}
-
-  ::selection{background:rgba(201,151,63,0.35);}
-
-  :focus-visible{outline:2px solid var(--brass-bright);outline-offset:2px;}
-
-  @media (prefers-reduced-motion: reduce){
-    *{transition:none !important; animation:none !important;}
-  }
-
-  /* ================= layout frame ================= */
-
-  .frame{
-    display:flex;
-    min-height:100vh;
-  }
-
-  /* ---------------- rail (sidebar) ---------------- */
-
-  .rail{
-    flex:0 0 236px;
-    display:flex;
-    flex-direction:column;
-    border-right:1px solid var(--line);
-    background:rgba(15,35,56,0.55);
-    backdrop-filter:blur(6px);
-    position:sticky;
-    top:0;
-    height:100vh;
-  }
-
-  .rail-brand{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    padding:22px 20px;
-    border-bottom:1px solid var(--line);
-  }
-
-  .seal{
-    flex:0 0 auto;
-    width:38px;
-    height:38px;
-    border-radius:50%;
-    border:1.5px solid var(--brass);
-    display:grid;
-    place-items:center;
-    font-family:"IBM Plex Mono",monospace;
-    font-size:0.72rem;
-    font-weight:600;
-    color:var(--brass-bright);
-    background:radial-gradient(circle at 35% 30%, rgba(201,151,63,0.16), transparent 70%);
-  }
-
-  .brand-copy strong{
-    display:block;
-    font-size:1.05rem;
-    font-weight:700;
-    letter-spacing:-0.01em;
-  }
-
-  .brand-copy span{
-    display:block;
-    margin-top:2px;
-    font-size:0.68rem;
-    color:var(--paper-faint);
-  }
-
-  .rail-nav{
-    flex:1;
-    padding:14px 10px;
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-  }
-
-  .rail-nav button{
-    display:flex;
-    align-items:center;
-    gap:11px;
-    padding:10px 12px;
-    text-align:left;
-    border-radius:3px;
-    font-size:0.855rem;
-    color:var(--paper-dim);
-    border-left:2px solid transparent;
-    transition:background 120ms ease, color 120ms ease, border-color 120ms ease;
-  }
-
-  .rail-nav button svg{flex:0 0 auto;opacity:0.75;}
-
-  .rail-nav button:hover{
-    background:rgba(62,112,153,0.10);
-    color:var(--paper);
-  }
-
-  .rail-nav button.active{
-    color:var(--paper);
-    background:rgba(201,151,63,0.08);
-    border-left-color:var(--brass);
-  }
-
-  .rail-nav button.active svg{opacity:1;stroke:var(--brass-bright);}
-
-  .rail-status{
-    padding:16px 20px 20px;
-    border-top:1px solid var(--line);
-    font-family:"IBM Plex Mono",monospace;
-    font-size:0.68rem;
-  }
-
-  .rail-status-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:5px 0;
-    color:var(--paper-faint);
-  }
-
-  .dot{
-    display:inline-block;
-    width:7px;height:7px;
-    border-radius:50%;
-    margin-right:6px;
-    background:var(--paper-faint);
-  }
-
-  .dot.on{background:var(--safe);box-shadow:0 0 0 3px rgba(89,166,126,0.15);}
-  .dot.off{background:var(--critical);box-shadow:0 0 0 3px rgba(219,96,103,0.15);}
-
-  /* ---------------- stage (main) ---------------- */
-
-  .stage{
-    flex:1;
-    min-width:0;
-    padding:28px 40px 64px;
-  }
-
-  .stage-top{
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:20px;
-    margin-bottom:26px;
-    padding-bottom:20px;
-    border-bottom:1px solid var(--line);
-  }
-
-  .stage-top h1{
-    font-size:1.6rem;
-    font-weight:700;
-    letter-spacing:-0.015em;
-  }
-
-  .stage-top p{
-    margin-top:6px;
-    max-width:56ch;
-    color:var(--paper-dim);
-    font-size:0.86rem;
-  }
-
-  .stage-top-actions{
-    display:flex;
-    align-items:center;
-    gap:14px;
-    flex:0 0 auto;
-    padding-top:2px;
-  }
-
-  .conn-note{
-    display:flex;
-    align-items:center;
-    font-family:"IBM Plex Mono",monospace;
-    font-size:0.68rem;
-    color:var(--paper-faint);
-    white-space:nowrap;
-  }
-
-  .btn-brass{
-    padding:10px 16px;
-    background:var(--brass);
-    color:#1C1204;
-    border-radius:3px;
-    font-weight:600;
-    font-size:0.83rem;
-    white-space:nowrap;
-    transition:background 120ms ease, transform 120ms ease;
-  }
-
-  .btn-brass:hover{background:var(--brass-bright);transform:translateY(-1px);}
-
-  .btn-ghost{
-    padding:10px 16px;
-    border:1px solid var(--line-bright);
-    border-radius:3px;
-    font-weight:600;
-    font-size:0.83rem;
-    color:var(--paper);
-    transition:border-color 120ms ease, background 120ms ease;
-  }
-
-  .btn-ghost:hover{background:rgba(62,112,153,0.10);border-color:var(--brass);}
-
-  .view{display:none;}
-  .view.active{display:block;animation:enter 220ms ease;}
-
-  @keyframes enter{
-    from{opacity:0;transform:translateY(4px);}
-    to{opacity:1;transform:translateY(0);}
-  }
-
-  /* ---------------- panels (title-block style) ---------------- */
-
-  .panel{
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    background:var(--panel);
-    overflow:hidden;
-  }
-
-  .panel-head{
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    gap:12px;
-    padding:12px 18px;
-    border-bottom:1px solid var(--line);
-    background:rgba(62,112,153,0.05);
-  }
-
-  .panel-head h3{
-    font-size:0.86rem;
-    font-weight:600;
-  }
-
-  .panel-head span{
-    font-family:"IBM Plex Mono",monospace;
-    font-size:0.68rem;
-    color:var(--paper-faint);
-  }
-
-  .panel-body{padding:20px;}
-
-  /* hero panel — the one signature element, with corner marks */
-
-  .hero{
-    position:relative;
-    display:grid;
-    grid-template-columns:220px 1fr;
-    gap:32px;
-    align-items:center;
-    padding:30px 34px;
-    margin-bottom:20px;
-  }
-
-  .corner{position:absolute;width:16px;height:16px;pointer-events:none;}
-  .corner::before,.corner::after{content:"";position:absolute;background:var(--brass);}
-  .corner::before{width:100%;height:1px;top:50%;left:0;}
-  .corner::after{width:1px;height:100%;left:50%;top:0;}
-  .corner.tl{top:-1px;left:-1px;}
-  .corner.tr{top:-1px;right:-1px;}
-  .corner.bl{bottom:-1px;left:-1px;}
-  .corner.br{bottom:-1px;right:-1px;}
-
-  .gauge{
-    width:190px;height:190px;
-    border-radius:50%;
-    position:relative;
-    display:grid;place-items:center;
-    background:conic-gradient(var(--gauge-color, var(--high)) calc(var(--pct,0)*1%), var(--panel-raised) 0);
-  }
-
-  .gauge::before{
-    content:"";
-    position:absolute;
-    inset:16px;
-    border-radius:50%;
-    background:var(--panel);
-    border:1px solid var(--line);
-  }
-
-  .gauge-readout{position:relative;text-align:center;z-index:1;}
-
-  .gauge-readout strong{
-    display:block;
-    font-family:"IBM Plex Mono",monospace;
-    font-size:2.4rem;
-    font-weight:600;
-    line-height:1;
-  }
-
-  .gauge-readout span{
-    display:block;
-    margin-top:6px;
-    font-size:0.68rem;
-    color:var(--paper-dim);
-  }
-
-  .hero-copy h2{
-    font-size:1.3rem;
-    font-weight:700;
-    line-height:1.35;
-    letter-spacing:-0.01em;
-    max-width:52ch;
-  }
-
-  .hero-copy p{
-    margin-top:12px;
-    max-width:58ch;
-    color:var(--paper-dim);
-    font-size:0.87rem;
-    line-height:1.55;
-  }
-
-  .hero-meta{
-    display:flex;
-    gap:22px;
-    margin-top:16px;
-    flex-wrap:wrap;
-  }
-
-  .hero-meta div{font-size:0.74rem;color:var(--paper-faint);}
-  .hero-meta strong{display:block;color:var(--paper);font-family:"IBM Plex Mono",monospace;font-size:0.9rem;margin-top:2px;}
-
-  /* stat tiles */
-
-  .tiles{
-    display:grid;
-    grid-template-columns:repeat(6,1fr);
-    gap:12px;
-    margin-bottom:20px;
-  }
-
-  .tile{
-    border:1px solid var(--line);
-    border-left:3px solid var(--tile-color, var(--line-bright));
-    border-radius:var(--radius);
-    background:var(--panel);
-    padding:14px 16px;
-  }
-
-  .tile span{
-    display:block;
-    font-size:0.68rem;
-    color:var(--paper-dim);
-  }
-
-  .tile strong{
-    display:block;
-    margin-top:8px;
-    font-family:"IBM Plex Mono",monospace;
-    font-size:1.5rem;
-    font-weight:600;
-  }
-
-  .grid-2{
-    display:grid;
-    grid-template-columns:1.3fr 1fr;
-    gap:16px;
-    margin-bottom:20px;
-    align-items:start;
-  }
-
-  .chart-wrap{height:270px;position:relative;}
-
-  .detail-list{font-size:0.82rem;}
-  .detail-row{
-    display:flex;
-    justify-content:space-between;
-    gap:16px;
-    padding:9px 0;
-    border-bottom:1px solid var(--line);
-    color:var(--paper-dim);
-  }
-  .detail-row:last-child{border-bottom:none;}
-  .detail-row b{color:var(--paper);font-weight:600;text-align:right;}
-  .detail-row b.mono{font-family:"IBM Plex Mono",monospace;font-weight:500;}
-
-  /* ---------------- forms ---------------- */
-
-  .field{margin-bottom:18px;}
-  .field label{
-    display:block;
-    margin-bottom:7px;
-    font-size:0.78rem;
-    color:var(--paper-dim);
-  }
-
-  .field .hint{
-    display:block;
-    margin-top:6px;
-    font-size:0.72rem;
-    color:var(--paper-faint);
-  }
-
-  input[type="text"], input[type="number"], select{
-    width:100%;
-    padding:10px 12px;
-    background:var(--ink);
-    border:1px solid var(--line);
-    border-radius:3px;
-    outline:none;
-    font-size:0.86rem;
-    transition:border-color 120ms ease;
-  }
-
-  input[type="text"]:hover, input[type="number"]:hover, select:hover{border-color:var(--line-bright);}
-  input[type="text"]:focus, input[type="number"]:focus, select:focus{border-color:var(--brass);}
-
-  input::placeholder{color:var(--paper-faint);}
-
-  .form-grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:20px;
-  }
-  .form-grid .full{grid-column:1/-1;}
-
-  .range-row{display:flex;align-items:center;gap:14px;}
-  input[type="range"]{
-    flex:1;
-    accent-color:var(--brass);
-  }
-  .range-value{
-    width:52px;
-    text-align:right;
-    font-family:"IBM Plex Mono",monospace;
-    font-size:0.85rem;
-  }
-
-  .weight-sum{
-    margin-top:6px;
-    font-family:"IBM Plex Mono",monospace;
-    font-size:0.76rem;
-    color:var(--paper-faint);
-  }
-  .weight-sum.warn{color:var(--critical);}
-
-  .banner{
-    margin-top:16px;
-    padding:11px 14px;
-    border:1px solid var(--line);
-    border-left:3px solid var(--brass);
-    border-radius:3px;
-    background:rgba(201,151,63,0.06);
-    font-size:0.82rem;
-    color:var(--paper-dim);
-  }
-
-  /* ---------------- tables ---------------- */
-
-  .toolbar{
-    display:flex;
-    gap:10px;
-    margin-bottom:14px;
-  }
-  .toolbar input{flex:0 1 320px;}
-  .toolbar select{flex:0 1 190px;}
-
-  .table-scroll{overflow-x:auto;}
-
-  table{width:100%;min-width:900px;border-collapse:collapse;font-size:0.82rem;}
-
-  thead th{
-    text-align:left;
-    padding:10px 14px;
-    font-size:0.68rem;
-    font-weight:600;
-    color:var(--paper-faint);
-    border-bottom:1px solid var(--line-bright);
-    white-space:nowrap;
-  }
-
-  tbody td{
-    padding:11px 14px;
-    border-bottom:1px solid var(--line);
-    color:var(--paper-dim);
-    vertical-align:middle;
-  }
-
-  tbody tr:last-child td{border-bottom:none;}
-  tbody tr:hover td{background:rgba(62,112,153,0.06);}
-
-  td.mono, .mono{font-family:"IBM Plex Mono",monospace;font-size:0.78rem;color:var(--paper);}
-
-  .flag{
-    display:inline-flex;
-    align-items:center;
-    padding:3px 8px 3px 7px;
-    border-left:2.5px solid var(--flag-color,var(--medium));
-    background:rgba(62,112,153,0.08);
-    font-size:0.74rem;
-    color:var(--paper);
-    border-radius:2px;
-    white-space:nowrap;
-  }
-
-  .urgent-yes{color:var(--critical);font-weight:600;}
-  .urgent-no{color:var(--paper-faint);}
-
-  /* ---------------- misc ---------------- */
-
-  .section-gap{margin-bottom:20px;}
-
-  .legend-row{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;}
-  .legend-item{display:flex;align-items:center;gap:7px;font-size:0.76rem;color:var(--paper-dim);}
-  .legend-swatch{width:9px;height:9px;border-radius:2px;}
-
-  footer.rail-note{padding:0 20px 18px;font-size:0.66rem;color:var(--paper-faint);}
-
-  @media (max-width:1080px){
-    .tiles{grid-template-columns:repeat(3,1fr);}
-    .grid-2{grid-template-columns:1fr;}
-    .hero{grid-template-columns:1fr;text-align:left;}
-    .gauge{margin:0 auto;}
-  }
-
-  @media (max-width:760px){
-    .frame{flex-direction:column;}
-    .rail{position:relative;height:auto;flex:0 0 auto;flex-direction:row;overflow-x:auto;}
-    .rail-brand{border-bottom:none;border-right:1px solid var(--line);}
-    .rail-nav{flex-direction:row;}
-    .rail-nav button.active{border-left:none;border-bottom:2px solid var(--brass);}
-    .rail-status{display:none;}
-    .stage{padding:22px 18px 48px;}
-    .tiles{grid-template-columns:repeat(2,1fr);}
-    .stage-top{flex-direction:column;}
-    .form-grid{grid-template-columns:1fr;}
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECDAT - Enterprise Cryptographic Discovery & Analysis Tool</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .header { background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.5rem; }
+        .nav { display: flex; gap: 0.5rem; }
+        .nav button { background: none; border: 1px solid #444; color: white; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+        .nav button.active { background: #0f3460; border-color: #e94560; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .tab { display: none; }
+        .tab.active { display: block; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h3 { color: #666; font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .card .value { font-size: 2rem; font-weight: bold; }
+        .card.critical .value { color: #e94560; }
+        .card.high .value { color: #f39c12; }
+        .card.medium .value { color: #3498db; }
+        .card.low .value { color: #2ecc71; }
+        .card.safe .value { color: #2ecc71; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
+        input, select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        button.primary { background: #0f3460; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+        button.primary:disabled { background: #999; cursor: not-allowed; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+        .badge.critical { background: #fee; color: #e94560; }
+        .badge.high { background: #fef3e2; color: #f39c12; }
+        .badge.medium { background: #e8f4fd; color: #3498db; }
+        .badge.low { background: #e8f8f0; color: #2ecc71; }
+        .badge.safe { background: #e8f8f0; color: #2ecc71; }
+        .progress { height: 4px; background: #eee; border-radius: 2px; overflow: hidden; margin: 1rem 0; }
+        .progress-bar { height: 100%; background: #0f3460; transition: width 0.3s; }
+        .hidden { display: none; }
+        .chart-container { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+    </style>
 </head>
 <body>
 
@@ -648,184 +105,105 @@
       </div>
     </div>
 
-    <!-- ============ OVERVIEW ============ -->
-    <section class="view active" id="view-overview">
-
-      <div class="panel hero">
-        <span class="corner tl"></span><span class="corner tr"></span>
-        <span class="corner bl"></span><span class="corner br"></span>
-
-        <div class="gauge" id="riskGauge">
-          <div class="gauge-readout">
-            <strong id="gaugeScore">–</strong>
-            <span id="gaugeLabel">composite risk</span>
-          </div>
-        </div>
-
-        <div class="hero-copy">
-          <h2 id="heroHeadline">Run a scan to see your cryptographic exposure.</h2>
-          <p id="heroSub">ECDAT reads your source tree and certificates, classifies every algorithm against Mosca's inequality, and tells you what to replace before a quantum computer makes the decision for you.</p>
-          <div class="hero-meta">
-            <div>Target<strong id="metaTarget">—</strong></div>
-            <div>Scan type<strong id="metaType">—</strong></div>
-            <div>Last run<strong id="metaWhen">—</strong></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="tiles">
-        <div class="tile" style="--tile-color:var(--line-bright)"><span>Total assets</span><strong id="tileTotal">0</strong></div>
-        <div class="tile" style="--tile-color:var(--critical)"><span>Critical</span><strong id="tileCritical">0</strong></div>
-        <div class="tile" style="--tile-color:var(--high)"><span>High</span><strong id="tileHigh">0</strong></div>
-        <div class="tile" style="--tile-color:var(--medium)"><span>Medium</span><strong id="tileMedium">0</strong></div>
-        <div class="tile" style="--tile-color:var(--paper-faint)"><span>Low</span><strong id="tileLow">0</strong></div>
-        <div class="tile" style="--tile-color:var(--safe)"><span>Quantum-safe</span><strong id="tileSafe">0</strong></div>
-      </div>
-
-      <div class="grid-2">
-        <div class="panel">
-          <div class="panel-head"><h3>Assets by risk bucket</h3><span id="chartMeta">n=0</span></div>
-          <div class="panel-body">
-            <div class="chart-wrap"><canvas id="riskChart"></canvas></div>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="panel-head"><h3>Scan detail</h3><span id="scanStatusTag">no scan</span></div>
-          <div class="panel-body">
-            <div class="detail-list">
-              <div class="detail-row"><span>Project</span><b id="dScanName">—</b></div>
-              <div class="detail-row"><span>Source</span><b class="mono" id="dScanSource">—</b></div>
-              <div class="detail-row"><span>Started</span><b id="dScanStart">—</b></div>
-              <div class="detail-row"><span>Completed</span><b id="dScanEnd">—</b></div>
-              <div class="detail-row"><span>Quantum vulnerable</span><b id="dVulnerable">—</b></div>
+    <div class="container">
+        <div id="dashboard" class="tab active">
+            <div class="cards">
+                <div class="card critical"><h3>Critical</h3><div class="value" id="stat-critical">0</div></div>
+                <div class="card high"><h3>High</h3><div class="value" id="stat-high">0</div></div>
+                <div class="card medium"><h3>Medium</h3><div class="value" id="stat-medium">0</div></div>
+                <div class="card low"><h3>Low</h3><div class="value" id="stat-low">0</div></div>
+                <div class="card safe"><h3>Quantum Safe</h3><div class="value" id="stat-safe">0</div></div>
+                <div class="card"><h3>Total Assets</h3><div class="value" id="stat-total">0</div></div>
             </div>
-            <button class="btn-ghost section-gap" style="margin-top:18px;width:100%;" id="downloadCbom">Download CBOM JSON</button>
-          </div>
+            <div class="chart-container">
+                <canvas id="riskChart"></canvas>
+            </div>
         </div>
-      </div>
-    </section>
 
-    <!-- ============ NEW SCAN ============ -->
-    <section class="view" id="view-scan">
-      <div class="panel">
-        <div class="panel-head"><h3>Scan configuration</h3><span>POST /api/scans</span></div>
-        <div class="panel-body">
-          <form id="scanForm">
-            <div class="form-grid">
-              <div class="field">
-                <label for="projectName">Project name</label>
-                <input type="text" id="projectName" placeholder="payments-service" required>
-              </div>
-              <div class="field">
-                <label for="targetType">Target type</label>
-                <select id="targetType">
-                  <option value="directory">Local directory</option>
-                  <option value="zip">ZIP archive</option>
-                  <option value="container">Container image</option>
+        <div id="scan" class="tab">
+            <h2>Start New Scan</h2>
+            <form id="scanForm">
+                <div class="form-group">
+                    <label>Project Name</label>
+                    <input type="text" id="projectName" placeholder="My Project" required>
+                </div>
+                <div class="form-group">
+                    <label>Scan Type</label>
+                    <select id="targetType" required>
+                        <option value="directory">Local Directory</option>
+                        <option value="zip">ZIP Upload</option>
+                    </select>
+                </div>
+                <div class="form-group" id="dirGroup">
+                    <label>Directory Path</label>
+                    <input type="text" id="sourceRef" placeholder="/path/to/code" required>
+                </div>
+                <div class="form-group hidden" id="zipGroup">
+                    <label>ZIP File</label>
+                    <input type="file" id="zipFile" accept=".zip">
+                </div>
+                <button type="submit" class="primary" id="scanBtn">Start Scan</button>
+            </form>
+            <div class="progress hidden" id="scanProgress"><div class="progress-bar" style="width: 0%"></div></div>
+            <div id="scanResult"></div>
+        </div>
+
+        <div id="assets" class="tab">
+            <h2>Cryptographic Assets</h2>
+            <div style="margin-bottom: 1rem;">
+                <input type="text" id="assetSearch" placeholder="Search assets..." style="width: 300px;">
+                <select id="riskFilter" style="margin-left: 1rem; padding: 0.5rem;">
+                    <option value="">All Risk Levels</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                    <option value="safe">Safe</option>
                 </select>
-              </div>
-              <div class="field full">
-                <label for="sourceRef">Source reference</label>
-                <input type="text" id="sourceRef" placeholder="/absolute/path/to/code" required>
-                <span class="hint">Excludes node_modules/, .git/, venv/ and build/ automatically.</span>
-              </div>
             </div>
-            <button type="submit" class="btn-brass" id="scanBtn">Start scan</button>
-          </form>
-          <div class="banner" id="scanBanner" style="display:none;"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ ASSETS ============ -->
-    <section class="view" id="view-assets">
-      <div class="toolbar">
-        <input type="text" id="assetSearch" placeholder="Search algorithm, file or language…">
-        <select id="riskFilter">
-          <option value="">All quantum risk levels</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="safe">Safe</option>
-        </select>
-      </div>
-
-      <div class="panel">
-        <div class="table-scroll">
-          <table id="assetsTable">
-            <thead>
-              <tr>
-                <th>Algorithm</th><th>File</th><th>Line</th><th>Language</th>
-                <th>Quantum risk</th><th>Risk score</th><th>Mosca urgent</th>
-                <th>Business criticality</th><th>Recommendation</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ RISK ASSESSMENT ============ -->
-    <section class="view" id="view-risk">
-      <div class="grid-2">
-        <div class="panel">
-          <div class="panel-head"><h3>Mosca's inequality</h3><span>X + Y &gt; Z</span></div>
-          <div class="panel-body">
-            <p style="font-size:0.86rem;color:var(--paper-dim);line-height:1.6;">
-              An asset is urgent when the years its data must stay confidential (X), plus the years its migration will take (Y), already exceed the years until a cryptographically relevant quantum computer arrives (Z). Under the current setting of <b class="mono" id="zYearsInline">10</b> years for Z, the assets below are already inside that window.
-            </p>
-            <div class="chart-wrap" style="height:230px;margin-top:18px;"><canvas id="moscaChart"></canvas></div>
-          </div>
+            <table id="assetsTable">
+                <thead>
+                    <tr>
+                        <th>Algorithm</th>
+                        <th>File</th>
+                        <th>Line</th>
+                        <th>Language</th>
+                        <th>Quantum Risk</th>
+                        <th>Risk Score</th>
+                        <th>Mosca Urgent</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
         </div>
 
-        <div class="panel">
-          <div class="panel-head"><h3>Urgency summary</h3><span id="riskChartMeta">n=0</span></div>
-          <div class="panel-body">
-            <div class="tiles" style="grid-template-columns:1fr;gap:10px;">
-              <div class="tile" style="--tile-color:var(--critical)"><span>Mosca urgent</span><strong id="riskUrgent">0</strong></div>
-              <div class="tile" style="--tile-color:var(--paper-faint)"><span>Not urgent</span><strong id="riskNotUrgent">0</strong></div>
-              <div class="tile" style="--tile-color:var(--high)"><span>Highest composite score</span><strong id="riskHighest">0</strong></div>
+        <div id="risk" class="tab">
+            <h2>Risk Assessment</h2>
+            <div class="chart-container">
+                <canvas id="moscaChart"></canvas>
             </div>
-          </div>
         </div>
-      </div>
 
-      <div class="panel">
-        <div class="panel-head"><h3>Assets inside the risk window</h3><span id="urgentMeta">n=0</span></div>
-        <div class="table-scroll">
-          <table id="urgentTable">
-            <thead><tr><th>Algorithm</th><th>File</th><th>Quantum risk</th><th>Risk score</th><th>Recommendation</th></tr></thead>
-            <tbody></tbody>
-          </table>
+        <div id="recommendations" class="tab">
+            <h2>PQC Recommendations</h2>
+            <table id="recTable">
+                <thead>
+                    <tr>
+                        <th>Algorithm</th>
+                        <th>Current Risk</th>
+                        <th>Recommended Replacement</th>
+                        <th>Standard</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
         </div>
-      </div>
-    </section>
 
-    <!-- ============ RECOMMENDATIONS ============ -->
-    <section class="view" id="view-recommend">
-      <div class="panel">
-        <div class="panel-head"><h3>Migration recommendations</h3><span id="recMeta">n=0 algorithms</span></div>
-        <div class="table-scroll">
-          <table id="recTable">
-            <thead><tr><th>Algorithm</th><th>Current risk</th><th>Recommended replacement</th><th>Standard</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ SETTINGS ============ -->
-    <section class="view" id="view-settings">
-      <div class="panel">
-        <div class="panel-head"><h3>Mosca assumption</h3><span>PUT /api/settings</span></div>
-        <div class="panel-body">
-          <div class="field" style="max-width:260px;">
-            <label for="zYears">Years until a relevant quantum computer (Z)</label>
-            <input type="number" id="zYears" value="10" min="1" max="40">
-            <span class="hint">Used to flag assets as Mosca-urgent across the whole scan.</span>
-          </div>
+        <div id="export" class="tab">
+            <h2>Export CBOM</h2>
+            <p>Download the CycloneDX CBOM JSON for the latest scan.</p>
+            <button class="primary" id="downloadCbom">Download CBOM JSON</button>
         </div>
       </div>
 
@@ -870,411 +248,171 @@
   </main>
 </div>
 
-<script>
-/* ================= config & contract ================= */
-const API_BASE = "http://localhost:3000/api";
-const SCANNER_URL = "http://localhost:8000";
+    <script>
+        const API_BASE = "http://localhost:3000/api";
+        let currentScanId = null;
+        let riskChart = null;
+        let moscaChart = null;
 
-const COLOR = {
-  critical:"#DB6067", high:"#DC9A52", medium:"#5A9BCB", safe:"#59A67E",
-  low:"#8AA8C4", grid:"rgba(138,168,196,0.14)", text:"#8AA8C4"
-};
+        document.querySelectorAll(".nav button").forEach(btn => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
+                document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+                btn.classList.add("active");
+                document.getElementById(btn.dataset.tab).classList.add("active");
+                if (btn.dataset.tab === "dashboard") loadDashboard();
+                if (btn.dataset.tab === "assets") loadAssets();
+                if (btn.dataset.tab === "recommendations") loadRecommendations();
+            });
+        });
 
-const QUANTUM_CLASS = {
-  "RSA-2048":"critical","RSA":"critical","ECDSA":"critical","ECDH":"critical",
-  "DSA":"critical","DH":"critical","MD5":"critical","SHA-1":"critical",
-  "DES":"critical","3DES":"critical","RC4":"critical","TLSv1.0":"critical","SSLv3":"critical",
-  "AES-128":"medium","SHA-256":"medium",
-  "AES-256":"safe","SHA-384":"safe","SHA-512":"safe",
-  "ML-KEM-768":"safe","ML-DSA":"safe","SLH-DSA":"safe","Blowfish":"high"
-};
+        document.getElementById("targetType").addEventListener("change", (e) => {
+            document.getElementById("dirGroup").classList.toggle("hidden", e.target.value !== "directory");
+            document.getElementById("zipGroup").classList.toggle("hidden", e.target.value !== "zip");
+        });
 
-/* ================= demo dataset (contract-shaped) ================= */
-/* Shown until the Node backend at :3000 responds — see BRAIN.md M5 */
+        document.getElementById("scanForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById("scanBtn");
+            const progress = document.getElementById("scanProgress");
+            btn.disabled = true;
+            btn.textContent = "Scanning...";
+            progress.classList.remove("hidden");
 
-const demoAssets = [
-  {algorithm:"RSA-2048", filePath:"src/auth/Login.java", lineNumber:42, language:"java", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:true, riskScore:88, recommendation:"Replace with ML-KEM (FIPS 203)", businessCriticality:"critical"},
-  {algorithm:"ECDSA", filePath:"src/auth/TokenSigner.java", lineNumber:17, language:"java", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:true, riskScore:84, recommendation:"Replace with ML-DSA (FIPS 204)", businessCriticality:"high"},
-  {algorithm:"MD5", filePath:"scanner/sample-vulnerable-app/legacy_hash.py", lineNumber:9, language:"python", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:true, riskScore:91, recommendation:"Replace with SHA-384 or SHA-512", businessCriticality:"medium"},
-  {algorithm:"SHA-1", filePath:"src/utils/checksum.py", lineNumber:22, language:"python", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:false, riskScore:74, recommendation:"Replace with SHA-384", businessCriticality:"low"},
-  {algorithm:"DES", filePath:"scanner/sample-vulnerable-app/old_crypto.c", lineNumber:14, language:"c", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:true, riskScore:93, recommendation:"Replace with AES-256-GCM", businessCriticality:"critical"},
-  {algorithm:"3DES", filePath:"src/payments/legacy_cipher.c", lineNumber:61, language:"c", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:true, riskScore:89, recommendation:"Replace with AES-256-GCM", businessCriticality:"critical"},
-  {algorithm:"RC4", filePath:"src/network/stream_cipher.js", lineNumber:8, language:"javascript", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:true, riskScore:82, recommendation:"Replace with ChaCha20-Poly1305", businessCriticality:"high"},
-  {algorithm:"DSA", filePath:"src/certs/keygen.py", lineNumber:33, language:"python", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:false, riskScore:71, recommendation:"Replace with ML-DSA (FIPS 204)", businessCriticality:"medium"},
-  {algorithm:"DH", filePath:"src/network/handshake.c", lineNumber:120, language:"c", assetType:"algorithm", quantumRisk:"critical", moscaUrgent:true, riskScore:85, recommendation:"Replace with ML-KEM (FIPS 203)", businessCriticality:"high"},
-  {algorithm:"TLSv1.0", filePath:"src/network/tls_config.c", lineNumber:5, language:"c", assetType:"protocol", quantumRisk:"critical", moscaUrgent:true, riskScore:90, recommendation:"Upgrade to TLS 1.3", businessCriticality:"critical"},
-  {algorithm:"Blowfish", filePath:"src/legacy/cipher_utils.c", lineNumber:27, language:"c", assetType:"algorithm", quantumRisk:"high", moscaUrgent:false, riskScore:66, recommendation:"Replace with AES-256-GCM or ChaCha20-Poly1305", businessCriticality:"medium"},
-  {algorithm:"AES-128", filePath:"src/storage/encrypt.py", lineNumber:44, language:"python", assetType:"algorithm", quantumRisk:"medium", moscaUrgent:false, riskScore:52, recommendation:"Upgrade key length to AES-256", businessCriticality:"medium"},
-  {algorithm:"SHA-256", filePath:"src/utils/hash_helper.js", lineNumber:12, language:"javascript", assetType:"algorithm", quantumRisk:"medium", moscaUrgent:false, riskScore:45, recommendation:"Upgrade to SHA-384 for long-term margin", businessCriticality:"low"},
-  {algorithm:"RSA-2048", filePath:"certs/server.pem", lineNumber:1, language:"pem", assetType:"certificate", quantumRisk:"critical", moscaUrgent:true, riskScore:86, recommendation:"Reissue with an ML-KEM hybrid certificate", businessCriticality:"critical"},
-  {algorithm:"AES-256", filePath:"src/storage/vault.py", lineNumber:30, language:"python", assetType:"algorithm", quantumRisk:"safe", moscaUrgent:false, riskScore:12, recommendation:"No action needed", businessCriticality:"high"},
-  {algorithm:"SHA-384", filePath:"src/certs/fingerprint.py", lineNumber:18, language:"python", assetType:"algorithm", quantumRisk:"safe", moscaUrgent:false, riskScore:8, recommendation:"No action needed", businessCriticality:"medium"},
-  {algorithm:"ML-KEM-768", filePath:"src/pqc/kex.py", lineNumber:5, language:"python", assetType:"algorithm", quantumRisk:"safe", moscaUrgent:false, riskScore:4, recommendation:"Already quantum-safe", businessCriticality:"high"}
-];
+            const formData = new FormData();
+            formData.append("projectName", document.getElementById("projectName").value);
+            formData.append("targetType", document.getElementById("targetType").value);
+            if (document.getElementById("targetType").value === "directory") {
+                formData.append("sourceRef", document.getElementById("sourceRef").value);
+            } else {
+                formData.append("zipFile", document.getElementById("zipFile").files[0]);
+            }
 
-const demoScanMeta = {
-  projectName:"payments-service",
-  targetType:"directory",
-  sourceRef:"~/repos/payments-service",
-  status:"completed",
-  startedAt:"2026-09-01 09:14",
-  completedAt:"2026-09-01 09:16"
-};
+            try {
+                const res = await fetch(`${API_BASE}/scans`, { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.success) {
+                    currentScanId = data.data.scanId;
+                    document.getElementById("scanResult").innerHTML = `<p style="color: green;">Scan completed! Found ${data.data.summary.totalAssets} assets.</p>`;
+                    loadDashboard();
+                } else {
+                    document.getElementById("scanResult").innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
+                }
+            } catch (err) {
+                document.getElementById("scanResult").innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Start Scan";
+                progress.classList.add("hidden");
+            }
+        });
 
-let currentAssets = [];
-let currentScanMeta = null;
-let backendOnline = false;
-let riskChart = null, moscaChart = null;
+        async function loadDashboard() {
+            try {
+                const res = await fetch(`${API_BASE}/scans`);
+                const data = await res.json();
+                if (!data.success || !data.data.length) return;
+                const scan = data.data[0];
+                currentScanId = scan._id;
+                document.getElementById("stat-critical").textContent = scan.summary.critical;
+                document.getElementById("stat-high").textContent = scan.summary.high;
+                document.getElementById("stat-medium").textContent = scan.summary.medium;
+                document.getElementById("stat-low").textContent = scan.summary.low;
+                document.getElementById("stat-safe").textContent = scan.summary.quantumSafeCount;
+                document.getElementById("stat-total").textContent = scan.summary.totalAssets;
 
-/* ================= risk bucket helpers ================= */
+                if (riskChart) riskChart.destroy();
+                const ctx = document.getElementById("riskChart").getContext("2d");
+                riskChart = new Chart(ctx, {
+                    type: "doughnut",
+                    data: {
+                        labels: ["Critical", "High", "Medium", "Low", "Safe"],
+                        datasets: [{
+                            data: [scan.summary.critical, scan.summary.high, scan.summary.medium, scan.summary.low, scan.summary.quantumSafeCount],
+                            backgroundColor: ["#e94560", "#f39c12", "#3498db", "#2ecc71", "#2ecc71"]
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
 
-function bucketOf(score){
-  if(score>=80) return "critical";
-  if(score>=60) return "high";
-  if(score>=35) return "medium";
-  return "low";
-}
+        async function loadAssets() {
+            if (!currentScanId) return;
+            try {
+                const res = await fetch(`${API_BASE}/scans/${currentScanId}/assets`);
+                const data = await res.json();
+                if (!data.success) return;
+                const tbody = document.querySelector("#assetsTable tbody");
+                tbody.innerHTML = data.data.assets.map(a => `
+                    <tr>
+                        <td>${a.algorithm}</td>
+                        <td>${a.filePath}</td>
+                        <td>${a.lineNumber}</td>
+                        <td>${a.language}</td>
+                        <td><span class="badge ${a.quantumRisk}">${a.quantumRisk}</span></td>
+                        <td>${a.riskScore}</td>
+                        <td>${a.moscaUrgent ? "Yes" : "No"}</td>
+                        <td>${a.recommendation}</td>
+                    </tr>
+                `).join("");
+            } catch (err) {
+                console.error(err);
+            }
+        }
 
-function computeSummary(assets){
-  const s = {totalAssets:assets.length, critical:0, high:0, medium:0, low:0, quantumSafeCount:0, quantumVulnerableCount:0};
-  assets.forEach(a=>{
-    s[bucketOf(a.riskScore)]++;
-    if(a.quantumRisk==="safe") s.quantumSafeCount++; else s.quantumVulnerableCount++;
-  });
-  return s;
-}
+        document.getElementById("assetSearch").addEventListener("input", loadAssets);
+        document.getElementById("riskFilter").addEventListener("change", loadAssets);
 
-/* ================= navigation ================= */
+        async function loadRecommendations() {
+            if (!currentScanId) return;
+            try {
+                const res = await fetch(`${API_BASE}/scans/${currentScanId}/assets`);
+                const data = await res.json();
+                if (!data.success) return;
+                const tbody = document.querySelector("#recTable tbody");
+                const seen = new Set();
+                tbody.innerHTML = data.data.assets
+                    .filter(a => {
+                        if (seen.has(a.algorithm)) return false;
+                        seen.add(a.algorithm);
+                        return true;
+                    })
+                    .map(a => `
+                        <tr>
+                            <td>${a.algorithm}</td>
+                            <td><span class="badge ${a.quantumRisk}">${a.quantumRisk}</span></td>
+                            <td>${a.recommendation}</td>
+                            <td>${a.recommendation.includes("FIPS") ? "NIST PQC" : "Best Practice"}</td>
+                        </tr>
+                    `).join("");
+            } catch (err) {
+                console.error(err);
+            }
+        }
 
-const viewMeta = {
-  overview:{title:"Overview", sub:"Everything this scan found, and what it means for your migration timeline."},
-  scan:{title:"New scan", sub:"Point the scanner at a source tree, archive, or container image."},
-  assets:{title:"Cryptographic assets", sub:"Every algorithm, certificate and protocol the scanner found, with its exposure and file location."},
-  risk:{title:"Risk assessment", sub:"Which assets fall inside the Mosca migration window, and how urgent each one really is."},
-  recommend:{title:"Recommendations", sub:"One recommended replacement per algorithm, mapped to NIST PQC standards where one exists."},
-  settings:{title:"Settings", sub:"Tune the Mosca time assumption and the weights behind the composite risk score."}
-};
+        document.getElementById("downloadCbom").addEventListener("click", async () => {
+            if (!currentScanId) return alert("No scan available");
+            try {
+                const res = await fetch(`${API_BASE}/scans/${currentScanId}/cbom`);
+                const data = await res.json();
+                if (data.success) {
+                    const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `cbom-${currentScanId}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            } catch (err) {
+                alert("Error: " + err.message);
+            }
+        });
 
-function goto(view){
-  document.querySelectorAll(".rail-nav button").forEach(b=>b.classList.toggle("active", b.dataset.view===view));
-  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active", v.id==="view-"+view));
-  document.getElementById("viewTitle").textContent = viewMeta[view].title;
-  document.getElementById("viewSub").textContent = viewMeta[view].sub;
-  if(view==="assets") renderAssetsTable();
-  if(view==="risk") renderRisk();
-  if(view==="recommend") renderRecommendations();
-}
-
-document.querySelectorAll(".rail-nav button").forEach(b=>b.addEventListener("click", ()=>goto(b.dataset.view)));
-document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click", ()=>goto(b.dataset.goto)));
-
-/* ================= backend connectivity check ================= */
-
-async function checkConnectivity(){
-  try{
-    const controller = new AbortController();
-    const t = setTimeout(()=>controller.abort(), 1000);
-    const res = await fetch(`${API_BASE}/scans`, {signal:controller.signal});
-    clearTimeout(t);
-    if(res.ok){
-      backendOnline = true;
-      document.getElementById("dotBackend").className = "dot on";
-      document.getElementById("connNote").textContent = "● live backend connected";
-      const data = await res.json();
-      if(data.success && data.data && data.data.length){
-        return data.data[0];
-      }
-    }
-  }catch(e){ /* offline — fall through to demo data */ }
-
-  backendOnline = false;
-  document.getElementById("dotBackend").className = "dot off";
-  document.getElementById("dotScanner").className = "dot off";
-  document.getElementById("connNote").textContent = "● demo dataset — backend offline";
-  return null;
-}
-
-/* ================= render: overview ================= */
-
-function loadOverview(scan){
-  currentAssets = scan ? (scan.assets || demoAssets) : demoAssets;
-  currentScanMeta = scan || demoScanMeta;
-  const summary = computeSummary(currentAssets);
-
-  const avg = Math.round(currentAssets.reduce((sum,a)=>sum+a.riskScore,0)/currentAssets.length);
-  const bucket = bucketOf(avg);
-  const gauge = document.getElementById("riskGauge");
-  gauge.style.setProperty("--pct", avg);
-  gauge.style.setProperty("--gauge-color", `var(--${bucket})`);
-  document.getElementById("gaugeScore").textContent = avg;
-  document.getElementById("gaugeLabel").textContent = bucket + " · composite risk";
-
-  document.getElementById("heroHeadline").textContent =
-    `${summary.totalAssets} cryptographic assets found. ${summary.quantumVulnerableCount} won't survive a quantum computer.`;
-  document.getElementById("heroSub").textContent =
-    `Of those, ${currentAssets.filter(a=>a.moscaUrgent).length} are already inside the Mosca migration window and should move to a NIST post-quantum standard first.`;
-
-  document.getElementById("metaTarget").textContent = (currentScanMeta.sourceRef||currentScanMeta.projectName||"—");
-  document.getElementById("metaType").textContent = currentScanMeta.targetType || "directory";
-  document.getElementById("metaWhen").textContent = currentScanMeta.completedAt || currentScanMeta.startedAt || "—";
-
-  document.getElementById("tileTotal").textContent = summary.totalAssets;
-  document.getElementById("tileCritical").textContent = summary.critical;
-  document.getElementById("tileHigh").textContent = summary.high;
-  document.getElementById("tileMedium").textContent = summary.medium;
-  document.getElementById("tileLow").textContent = summary.low;
-  document.getElementById("tileSafe").textContent = summary.quantumSafeCount;
-
-  document.getElementById("chartMeta").textContent = "n=" + summary.totalAssets;
-  document.getElementById("dScanName").textContent = currentScanMeta.projectName || "—";
-  document.getElementById("dScanSource").textContent = currentScanMeta.sourceRef || "—";
-  document.getElementById("dScanStart").textContent = currentScanMeta.startedAt || "—";
-  document.getElementById("dScanEnd").textContent = currentScanMeta.completedAt || "—";
-  document.getElementById("dVulnerable").textContent = summary.quantumVulnerableCount + " of " + summary.totalAssets;
-  document.getElementById("scanStatusTag").textContent = currentScanMeta.status || "completed";
-
-  renderRiskChart(summary);
-}
-
-function renderRiskChart(summary){
-  if(riskChart) riskChart.destroy();
-  const ctx = document.getElementById("riskChart");
-  riskChart = new Chart(ctx, {
-    type:"bar",
-    data:{
-      labels:["Critical","High","Medium","Low"],
-      datasets:[{
-        data:[summary.critical, summary.high, summary.medium, summary.low],
-        backgroundColor:[COLOR.critical, COLOR.high, COLOR.medium, COLOR.low],
-        borderRadius:3,
-        maxBarThickness:56
-      }]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{
-        x:{grid:{display:false}, ticks:{color:COLOR.text, font:{family:"Space Grotesk", size:11}}},
-        y:{beginAtZero:true, grid:{color:COLOR.grid}, ticks:{color:COLOR.text, font:{family:"IBM Plex Mono", size:10}}}
-      }
-    }
-  });
-}
-
-document.getElementById("downloadCbom").addEventListener("click", ()=>{
-  const cbom = {
-    bomFormat:"CBOM", specVersion:"1.6", serialNumber:"urn:uuid:demo-" + Date.now(),
-    metadata:{timestamp:new Date().toISOString(), component:{name:currentScanMeta?.projectName||"project", type:"application"}},
-    components: currentAssets.map(a=>({
-      type: a.assetType==="certificate" ? "cryptographic-asset" : "cryptographic-asset",
-      name:a.algorithm, evidence:{occurrences:[{location:a.filePath, line:a.lineNumber}]},
-      properties:[{name:"quantumRisk", value:a.quantumRisk},{name:"riskScore", value:String(a.riskScore)},{name:"recommendation", value:a.recommendation}]
-    }))
-  };
-  const blob = new Blob([JSON.stringify(cbom,null,2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = `cbom-${(currentScanMeta?.projectName||"scan").replace(/\s+/g,"-")}.json`;
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-});
-
-/* ================= render: assets ================= */
-
-function renderAssetsTable(){
-  const search = document.getElementById("assetSearch").value.trim().toLowerCase();
-  const riskFilter = document.getElementById("riskFilter").value;
-
-  const filtered = currentAssets.filter(a=>{
-    const hay = [a.algorithm,a.filePath,a.language].join(" ").toLowerCase();
-    const matchesSearch = !search || hay.includes(search);
-    const matchesRisk = !riskFilter || a.quantumRisk===riskFilter;
-    return matchesSearch && matchesRisk;
-  });
-
-  const tbody = document.querySelector("#assetsTable tbody");
-  if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--paper-faint);padding:24px 14px;">No assets match these filters.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = filtered.map(a=>`
-    <tr>
-      <td class="mono">${esc(a.algorithm)}</td>
-      <td class="mono">${esc(a.filePath)}</td>
-      <td class="mono">${esc(a.lineNumber)}</td>
-      <td>${esc(a.language)}</td>
-      <td>${flag(a.quantumRisk)}</td>
-      <td class="mono">${esc(a.riskScore)}</td>
-      <td class="${a.moscaUrgent?'urgent-yes':'urgent-no'}">${a.moscaUrgent?'Yes':'No'}</td>
-      <td>${esc(a.businessCriticality)}</td>
-      <td>${esc(a.recommendation)}</td>
-    </tr>
-  `).join("");
-}
-
-document.getElementById("assetSearch").addEventListener("input", renderAssetsTable);
-document.getElementById("riskFilter").addEventListener("change", renderAssetsTable);
-
-function flag(level){
-  const colorVar = {critical:"var(--critical)", high:"var(--high)", medium:"var(--medium)", safe:"var(--safe)"}[level] || "var(--medium)";
-  return `<span class="flag" style="--flag-color:${colorVar}">${esc(level)}</span>`;
-}
-
-/* ================= render: risk assessment ================= */
-
-function renderRisk(){
-  const urgent = currentAssets.filter(a=>a.moscaUrgent);
-  const notUrgent = currentAssets.filter(a=>!a.moscaUrgent);
-  const highest = currentAssets.reduce((m,a)=>Math.max(m,a.riskScore),0);
-
-  document.getElementById("riskUrgent").textContent = urgent.length;
-  document.getElementById("riskNotUrgent").textContent = notUrgent.length;
-  document.getElementById("riskHighest").textContent = highest;
-  document.getElementById("riskChartMeta").textContent = "n=" + currentAssets.length;
-  document.getElementById("urgentMeta").textContent = "n=" + urgent.length;
-  document.getElementById("zYearsInline").textContent = document.getElementById("zYears").value;
-
-  if(moscaChart) moscaChart.destroy();
-  moscaChart = new Chart(document.getElementById("moscaChart"), {
-    type:"doughnut",
-    data:{labels:["Mosca urgent","Not urgent"], datasets:[{data:[urgent.length, notUrgent.length], backgroundColor:[COLOR.critical,"#284866"], borderColor:"#0F2338", borderWidth:4, hoverOffset:4}]},
-    options:{responsive:true, maintainAspectRatio:false, cutout:"72%",
-      plugins:{legend:{position:"bottom", labels:{color:COLOR.text, usePointStyle:true, pointStyle:"circle", padding:16, font:{family:"Space Grotesk", size:11}}}}}
-  });
-
-  const tbody = document.querySelector("#urgentTable tbody");
-  tbody.innerHTML = urgent.length ? urgent.sort((a,b)=>b.riskScore-a.riskScore).map(a=>`
-    <tr>
-      <td class="mono">${esc(a.algorithm)}</td>
-      <td class="mono">${esc(a.filePath)}</td>
-      <td>${flag(a.quantumRisk)}</td>
-      <td class="mono">${esc(a.riskScore)}</td>
-      <td>${esc(a.recommendation)}</td>
-    </tr>
-  `).join("") : `<tr><td colspan="5" style="color:var(--paper-faint);padding:24px 14px;">Nothing is inside the migration window yet.</td></tr>`;
-}
-
-/* ================= render: recommendations ================= */
-
-function renderRecommendations(){
-  const seen = new Set();
-  const unique = currentAssets.filter(a=>{
-    if(seen.has(a.algorithm)) return false;
-    seen.add(a.algorithm); return true;
-  });
-  document.getElementById("recMeta").textContent = "n=" + unique.length + " algorithms";
-
-  const tbody = document.querySelector("#recTable tbody");
-  tbody.innerHTML = unique.map(a=>`
-    <tr>
-      <td class="mono">${esc(a.algorithm)}</td>
-      <td>${flag(a.quantumRisk)}</td>
-      <td>${esc(a.recommendation)}</td>
-      <td>${/FIPS|ML-KEM|ML-DSA|SLH-DSA/.test(a.recommendation) ? "NIST PQC" : "Best practice"}</td>
-    </tr>
-  `).join("");
-}
-
-/* ================= scan form ================= */
-
-document.getElementById("scanForm").addEventListener("submit", async (e)=>{
-  e.preventDefault();
-  const btn = document.getElementById("scanBtn");
-  const banner = document.getElementById("scanBanner");
-  const projectName = document.getElementById("projectName").value;
-  const targetType = document.getElementById("targetType").value;
-  const sourceRef = document.getElementById("sourceRef").value;
-
-  btn.disabled = true; btn.textContent = "Scanning…";
-  banner.style.display = "none";
-
-  try{
-    const controller = new AbortController();
-    const t = setTimeout(()=>controller.abort(), 1200);
-    const res = await fetch(`${API_BASE}/scans`, {
-      method:"POST", headers:{"Content-Type":"application/json"}, signal:controller.signal,
-      body: JSON.stringify({projectName, targetType, sourceRef})
-    });
-    clearTimeout(t);
-    const data = await res.json();
-    if(data.success){
-      banner.style.display = "block";
-      banner.textContent = `Scan queued. Found ${data.data.summary?.totalAssets ?? "—"} assets.`;
-      goto("overview");
-      const rescan = await checkConnectivity();
-      loadOverview(rescan);
-    }else{
-      throw new Error(data.error || "Scan failed");
-    }
-  }catch(err){
-    demoScanMeta.projectName = projectName || demoScanMeta.projectName;
-    demoScanMeta.sourceRef = sourceRef || demoScanMeta.sourceRef;
-    demoScanMeta.targetType = targetType;
-    banner.style.display = "block";
-    banner.textContent = "Backend not reachable at :3000 — showing the demo dataset instead (see BRAIN.md M5).";
-    loadOverview(null);
-    goto("overview");
-  }finally{
-    btn.disabled = false; btn.textContent = "Start scan";
-  }
-});
-
-/* ================= settings ================= */
-
-function bindRange(id, valId){
-  const input = document.getElementById(id);
-  const out = document.getElementById(valId);
-  input.addEventListener("input", ()=>{ out.textContent = Number(input.value).toFixed(2); updateWeightSum(); });
-}
-["wQuantum","wBusiness","wMosca","wExpiry"].forEach(id=>bindRange(id, id+"Val"));
-
-function updateWeightSum(){
-  const sum = ["wQuantum","wBusiness","wMosca","wExpiry"].reduce((s,id)=>s+Number(document.getElementById(id).value),0);
-  const el = document.getElementById("weightSum");
-  el.textContent = "Current sum: " + sum.toFixed(2);
-  el.classList.toggle("warn", Math.abs(sum-1) > 0.001);
-  document.getElementById("weightSumTag").textContent = Math.abs(sum-1)<0.001 ? "sums to 1.00" : "does not sum to 1.00";
-}
-
-document.getElementById("zYears").addEventListener("input", ()=>{
-  document.getElementById("zYearsInline").textContent = document.getElementById("zYears").value;
-});
-
-document.getElementById("saveSettings").addEventListener("click", async ()=>{
-  const banner = document.getElementById("settingsBanner");
-  const payload = {
-    zAssumptionYears: Number(document.getElementById("zYears").value),
-    weightQuantum: Number(document.getElementById("wQuantum").value),
-    weightBusiness: Number(document.getElementById("wBusiness").value),
-    weightMosca: Number(document.getElementById("wMosca").value),
-    weightExpiry: Number(document.getElementById("wExpiry").value)
-  };
-  banner.style.display = "block";
-  try{
-    const controller = new AbortController();
-    const t = setTimeout(()=>controller.abort(), 1000);
-    const res = await fetch(`${API_BASE}/settings`, {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload), signal:controller.signal});
-    clearTimeout(t);
-    const data = await res.json();
-    banner.textContent = data.success ? "Settings saved." : (data.error || "Could not save settings.");
-  }catch(err){
-    banner.textContent = "Backend not reachable at :3000 — settings kept locally for this session only.";
-  }
-});
-
-/* ================= utility ================= */
-
-function esc(v){
-  return String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
-}
-
-/* ================= boot ================= */
-
-(async function init(){
-  const live = await checkConnectivity();
-  loadOverview(live);
-})();
-</script>
+        loadDashboard();
+    </script>
 </body>
 </html>

@@ -1,10 +1,10 @@
 from scanner.risk.classify import classify_quantum_risk
 from scanner.risk.mosca import is_mosca_urgent, get_default_x_years, DEFAULT_Y_YEARS, DEFAULT_Z_YEARS
 
-QUANTUM_WEIGHT = 0.40
-BUSINESS_WEIGHT = 0.30
-MOSCA_WEIGHT = 0.20
-EXPIRY_WEIGHT = 0.10
+DEFAULT_QUANTUM_WEIGHT = 0.40
+DEFAULT_BUSINESS_WEIGHT = 0.30
+DEFAULT_MOSCA_WEIGHT = 0.20
+DEFAULT_EXPIRY_WEIGHT = 0.10
 
 QUANTUM_SCORES = {"critical": 100, "high": 75, "medium": 50, "safe": 0}
 BUSINESS_SCORES = {"critical": 100, "high": 75, "medium": 50, "low": 25}
@@ -16,7 +16,11 @@ def calculate_risk_score(
     asset_type: str = "algorithm",
     key_size: int = 0,
     not_valid_after: str = None,
-    z_years: int = DEFAULT_Z_YEARS
+    z_years: int = DEFAULT_Z_YEARS,
+    weight_quantum: float = DEFAULT_QUANTUM_WEIGHT,
+    weight_business: float = DEFAULT_BUSINESS_WEIGHT,
+    weight_mosca: float = DEFAULT_MOSCA_WEIGHT,
+    weight_expiry: float = DEFAULT_EXPIRY_WEIGHT,
 ) -> dict:
     quantum_risk = classify_quantum_risk(algorithm)
     quantum_score = QUANTUM_SCORES.get(quantum_risk, 50)
@@ -44,10 +48,10 @@ def calculate_risk_score(
             expiry_score = 0
     
     risk_score = (
-        QUANTUM_WEIGHT * quantum_score +
-        BUSINESS_WEIGHT * business_score +
-        MOSCA_WEIGHT * mosca_score +
-        EXPIRY_WEIGHT * expiry_score
+        weight_quantum * quantum_score +
+        weight_business * business_score +
+        weight_mosca * mosca_score +
+        weight_expiry * expiry_score
     )
     risk_score = int(round(risk_score))
     
