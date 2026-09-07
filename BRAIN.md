@@ -34,10 +34,10 @@ One-line pitch: "We find your broken crypto before quantum computers do."
 ## CURRENT STATE
 
 ```
-Last updated:        2026-09-01
-Last thing done:     Fixed 3 scanner bugs: TLSv1/SSLv3 classification, comment false-positives, bare-call detection gap
-Currently broken:    Node.js not installed on this machine (backend untested), Python scanner fully working
-Next thing to do:    Install Node.js, set up MongoDB Atlas, run backend, test full stack
+Last updated:        2026-09-06
+Last thing done:     Wired all 6 frontend tabs to real backend endpoints (Contract 2), added loading/empty/error states, created shared API_BASE_URL config
+Currently broken:    Node.js not installed on this machine (backend untested end-to-end), Python scanner contract test PASSING
+Next thing to do:    Install Node.js, set up MongoDB Atlas, run backend, test full stack end-to-end
 ```
 
 ### Milestone Status
@@ -48,24 +48,37 @@ M2 — Certificate Scanner:            [x] COMPLETE
 M3 — Risk + Recommendation Engine:   [x] COMPLETE
 M4 — CBOM Output:                    [x] COMPLETE
 M5 — Node Backend + MongoDB:         [~] SCAFFOLDED (Node.js not installed)
-M6 — Frontend (6 pages):             [x] COMPLETE (single HTML file)
+M6 — Frontend (6 pages):             [~] IN PROGRESS (wired to backend, needs live backend test)
 ```
 
-### Recent Bug Fixes (2026-09-01)
+### Recent Frontend Changes (2026-09-06)
 ```
-BUG 1 — scanner/risk/classify.py (Krish):
-  Added TLSV1/SSLV3 to QUANTUM_VULNERABILITY dict → "critical"
-  Fixes: deprecated TLS/SSL were silently downgraded to "medium"
+STEP 1 — Shared API config:
+  Created frontend/config.js with single API_BASE_URL constant
+  All tabs now import from window.ECDAT_CONFIG.API_BASE
+  To change for Render deployment: edit ONE line in config.js
 
-BUG 2 — scanner/detectors/source_scanner.py (Divay):
-  Skip comment lines before regex matching per language:
-    Python: #..., Java/C/C++/JS/TS: //, /*, *
-  Fixes: false positives from comments/docstrings
+STEP 2 — Wired each tab to Contract 2 endpoints:
+  Dashboard:   GET /api/scans -> latest scan -> real summary
+  Scan:        POST /api/scans + polling GET /api/scans/:id (2s interval)
+  Assets:      GET /api/scans/:id/assets -> searchable/filterable table
+  Risk:        Bar chart (risk score dist) + Pie chart (Mosca urgent) via Chart.js
+  Recommendations: Unique algorithm -> recommendation table from assets
+  Export:      GET /api/scans/:id/cbom -> download JSON file
 
-BUG 3 — scanner/detectors/rules.py (Divay):
-  Added bare-call patterns for pycryptodome idiomatic usage:
-    DES.new(), AES.new(), ARC4.new(), RSA.generate(), RSA.import_key(), ECC.generate()
-  Fixes: scanner missed imports like "from Crypto.Cipher import DES" + bare "DES.new()"
+STEP 3 — States added:
+  Loading:  Spinner + message during fetch
+  Empty:    "No scans yet" / "Run a scan first" with context
+  Error:    Red message with error details
+
+STEP 4 — End-to-end test: PENDING (needs Node.js + MongoDB)
+```
+
+### API Config Location
+```
+File: frontend/config.js
+Constant: const API_BASE_URL = "http://localhost:3000";
+To deploy: Change to "https://your-render-app.onrender.com"
 ```
 Change [ ] to [x] when complete. Change to [~] if in progress.
 
@@ -180,8 +193,16 @@ Content-Type: application/json
 
 Request body:
 {
-  "target_path": "/absolute/path/to/code/folder"
+  "target_path": "/absolute/path/to/code/folder",
+  "z_years": 10,
+  "weight_quantum": 0.40,
+  "weight_business": 0.30,
+  "weight_mosca": 0.20,
+  "weight_expiry": 0.10
 }
+
+All settings fields are optional. Defaults match the hardcoded values used before this change.
+If omitted, the scanner uses: z_years=10, weight_quantum=0.40, weight_business=0.30, weight_mosca=0.20, weight_expiry=0.10
 
 Response (200 OK):
 {

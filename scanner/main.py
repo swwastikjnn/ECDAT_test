@@ -16,6 +16,11 @@ app = FastAPI(title="ECDAT Scanner", version="0.1.0")
 
 class ScanRequest(BaseModel):
     target_path: str
+    z_years: int = 10
+    weight_quantum: float = 0.40
+    weight_business: float = 0.30
+    weight_mosca: float = 0.20
+    weight_expiry: float = 0.10
 
 class Asset(BaseModel):
     algorithm: str
@@ -68,6 +73,11 @@ def scan(request: ScanRequest):
             asset_type=finding.get("asset_type", "algorithm"),
             key_size=finding.get("key_size", 0),
             not_valid_after=finding.get("not_valid_after"),
+            z_years=request.z_years,
+            weight_quantum=request.weight_quantum,
+            weight_business=request.weight_business,
+            weight_mosca=request.weight_mosca,
+            weight_expiry=request.weight_expiry,
         )
         finding["quantum_risk"] = risk_result["quantum_risk"]
         finding["mosca_urgent"] = risk_result["mosca_urgent"]
@@ -95,4 +105,5 @@ def scan(request: ScanRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

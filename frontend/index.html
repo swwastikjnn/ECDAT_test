@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ECDAT - Enterprise Cryptographic Discovery & Analysis Tool</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="config.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
@@ -13,6 +14,7 @@
         .nav { display: flex; gap: 0.5rem; }
         .nav button { background: none; border: 1px solid #444; color: white; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
         .nav button.active { background: #0f3460; border-color: #e94560; }
+        .nav button:disabled { opacity: 0.5; cursor: not-allowed; }
         .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
         .tab { display: none; }
         .tab.active { display: block; }
@@ -30,6 +32,8 @@
         input, select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
         button.primary { background: #0f3460; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
         button.primary:disabled { background: #999; cursor: not-allowed; }
+        button.secondary { background: #6c757d; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+        button.secondary:disabled { background: #999; cursor: not-allowed; }
         table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; font-weight: 600; }
@@ -43,6 +47,30 @@
         .progress-bar { height: 100%; background: #0f3460; transition: width 0.3s; }
         .hidden { display: none; }
         .chart-container { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        
+        /* State components */
+        .state-message { padding: 2rem; text-align: center; color: #666; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .state-message.error { color: #e94560; }
+        .state-message.loading { color: #0f3460; }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #eee; border-top-color: #0f3460; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .scan-status { padding: 1rem; background: #f8f9fa; border-radius: 8px; margin: 1rem 0; }
+        .scan-status.queued { border-left: 4px solid #6c757d; }
+        .scan-status.running { border-left: 4px solid #0f3460; }
+        .scan-status.completed { border-left: 4px solid #2ecc71; }
+        .scan-status.failed { border-left: 4px solid #e94560; }
+        
+        .filters { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+        .filters input, .filters select { width: auto; min-width: 200px; }
+        
+        .risk-bar { height: 20px; background: #eee; border-radius: 4px; overflow: hidden; }
+        .risk-bar-fill { height: 100%; transition: width 0.3s; }
+        .risk-bar-fill.critical { background: #e94560; }
+        .risk-bar-fill.high { background: #f39c12; }
+        .risk-bar-fill.medium { background: #3498db; }
+        .risk-bar-fill.low { background: #2ecc71; }
+        .risk-bar-fill.safe { background: #2ecc71; }
     </style>
 </head>
 <body>
@@ -59,20 +87,29 @@
     </div>
 
     <div class="container">
+        <!-- DASHBOARD TAB -->
         <div id="dashboard" class="tab active">
-            <div class="cards">
-                <div class="card critical"><h3>Critical</h3><div class="value" id="stat-critical">0</div></div>
-                <div class="card high"><h3>High</h3><div class="value" id="stat-high">0</div></div>
-                <div class="card medium"><h3>Medium</h3><div class="value" id="stat-medium">0</div></div>
-                <div class="card low"><h3>Low</h3><div class="value" id="stat-low">0</div></div>
-                <div class="card safe"><h3>Quantum Safe</h3><div class="value" id="stat-safe">0</div></div>
-                <div class="card"><h3>Total Assets</h3><div class="value" id="stat-total">0</div></div>
-            </div>
-            <div class="chart-container">
-                <canvas id="riskChart"></canvas>
+            <div id="dashboardLoading" class="state-message loading hidden"><span class="spinner"></span>Loading dashboard...</div>
+            <div id="dashboardEmpty" class="state-message hidden">No scans yet. Go to the <strong>Scan</strong> tab to start your first scan.</div>
+            <div id="dashboardError" class="state-message error hidden"></div>
+            
+            <div id="dashboardContent" class="hidden">
+                <div class="cards">
+                    <div class="card critical"><h3>Critical</h3><div class="value" id="stat-critical">0</div></div>
+                    <div class="card high"><h3>High</h3><div class="value" id="stat-high">0</div></div>
+                    <div class="card medium"><h3>Medium</h3><div class="value" id="stat-medium">0</div></div>
+                    <div class="card low"><h3>Low</h3><div class="value" id="stat-low">0</div></div>
+                    <div class="card safe"><h3>Quantum Safe</h3><div class="value" id="stat-safe">0</div></div>
+                    <div class="card"><h3>Total Assets</h3><div class="value" id="stat-total">0</div></div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="riskChart"></canvas>
+                </div>
+                <p style="margin-top: 1rem; color: #666; font-size: 0.9rem;">Showing latest scan: <span id="latestScanInfo"></span></p>
             </div>
         </div>
 
+        <!-- SCAN TAB -->
         <div id="scan" class="tab">
             <h2>Start New Scan</h2>
             <form id="scanForm">
@@ -97,75 +134,133 @@
                 </div>
                 <button type="submit" class="primary" id="scanBtn">Start Scan</button>
             </form>
-            <div class="progress hidden" id="scanProgress"><div class="progress-bar" style="width: 0%"></div></div>
+            
+            <div id="scanStatusContainer" class="hidden">
+                <div class="scan-status" id="scanStatus">
+                    <strong>Status:</strong> <span id="scanStatusText">queued</span>
+                    <div class="progress" style="margin-top: 0.5rem;">
+                        <div class="progress-bar" id="scanProgressBar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            
             <div id="scanResult"></div>
         </div>
 
+        <!-- ASSETS TAB -->
         <div id="assets" class="tab">
-            <h2>Cryptographic Assets</h2>
-            <div style="margin-bottom: 1rem;">
-                <input type="text" id="assetSearch" placeholder="Search assets..." style="width: 300px;">
-                <select id="riskFilter" style="margin-left: 1rem; padding: 0.5rem;">
-                    <option value="">All Risk Levels</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                    <option value="safe">Safe</option>
-                </select>
+            <div id="assetsLoading" class="state-message loading hidden"><span class="spinner"></span>Loading assets...</div>
+            <div id="assetsEmpty" class="state-message hidden">No assets found. Run a scan first.</div>
+            <div id="assetsError" class="state-message error hidden"></div>
+            
+            <div id="assetsContent" class="hidden">
+                <h2>Cryptographic Assets</h2>
+                <div class="filters">
+                    <input type="text" id="assetSearch" placeholder="Search assets (algorithm, file, language)...">
+                    <select id="riskFilter">
+                        <option value="">All Risk Levels</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="safe">Safe</option>
+                    </select>
+                    <select id="languageFilter">
+                        <option value="">All Languages</option>
+                        <option value="python">Python</option>
+                        <option value="java">Java</option>
+                        <option value="c">C</option>
+                        <option value="cpp">C++</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="typescript">TypeScript</option>
+                        <option value="certificate">Certificate</option>
+                    </select>
+                    <span id="assetsCount" style="color: #666; font-size: 0.9rem;"></span>
+                </div>
+                <table id="assetsTable">
+                    <thead>
+                        <tr>
+                            <th>Algorithm</th>
+                            <th>File</th>
+                            <th>Line</th>
+                            <th>Language</th>
+                            <th>Quantum Risk</th>
+                            <th>Risk Score</th>
+                            <th>Mosca Urgent</th>
+                            <th>Recommendation</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
-            <table id="assetsTable">
-                <thead>
-                    <tr>
-                        <th>Algorithm</th>
-                        <th>File</th>
-                        <th>Line</th>
-                        <th>Language</th>
-                        <th>Quantum Risk</th>
-                        <th>Risk Score</th>
-                        <th>Mosca Urgent</th>
-                        <th>Recommendation</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
         </div>
 
+        <!-- RISK TAB -->
         <div id="risk" class="tab">
-            <h2>Risk Assessment</h2>
-            <div class="chart-container">
-                <canvas id="moscaChart"></canvas>
+            <div id="riskLoading" class="state-message loading hidden"><span class="spinner"></span>Loading risk assessment...</div>
+            <div id="riskEmpty" class="state-message hidden">No risk data available. Run a scan first.</div>
+            <div id="riskError" class="state-message error hidden"></div>
+            
+            <div id="riskContent" class="hidden">
+                <h2>Risk Assessment</h2>
+                <div class="chart-container" style="margin-bottom: 2rem;">
+                    <canvas id="riskScoreChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="moscaChart"></canvas>
+                </div>
             </div>
         </div>
 
+        <!-- RECOMMENDATIONS TAB -->
         <div id="recommendations" class="tab">
-            <h2>PQC Recommendations</h2>
-            <table id="recTable">
-                <thead>
-                    <tr>
-                        <th>Algorithm</th>
-                        <th>Current Risk</th>
-                        <th>Recommended Replacement</th>
-                        <th>Standard</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+            <div id="recLoading" class="state-message loading hidden"><span class="spinner"></span>Loading recommendations...</div>
+            <div id="recEmpty" class="state-message hidden">No recommendations available. Run a scan first.</div>
+            <div id="recError" class="state-message error hidden"></div>
+            
+            <div id="recContent" class="hidden">
+                <h2>PQC Recommendations</h2>
+                <table id="recTable">
+                    <thead>
+                        <tr>
+                            <th>Algorithm</th>
+                            <th>Current Risk</th>
+                            <th>Recommended Replacement</th>
+                            <th>Standard</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
 
+        <!-- EXPORT TAB -->
         <div id="export" class="tab">
-            <h2>Export CBOM</h2>
-            <p>Download the CycloneDX CBOM JSON for the latest scan.</p>
-            <button class="primary" id="downloadCbom">Download CBOM JSON</button>
+            <div id="exportLoading" class="state-message loading hidden"><span class="spinner"></span>Preparing download...</div>
+            <div id="exportEmpty" class="state-message hidden">No CBOM available. Run a scan first.</div>
+            <div id="exportError" class="state-message error hidden"></div>
+            
+            <div id="exportContent" class="hidden">
+                <h2>Export CBOM</h2>
+                <p>Download the CycloneDX CBOM JSON for the latest scan.</p>
+                <button class="primary" id="downloadCbom">Download CBOM JSON</button>
+                <p id="exportInfo" style="margin-top: 1rem; color: #666; font-size: 0.9rem;"></p>
+            </div>
         </div>
     </div>
 
     <script>
-        const API_BASE = "http://localhost:3000/api";
+        // Use config from config.js
+        const API_BASE = window.ECDAT_CONFIG?.API_BASE || "http://localhost:3000/api";
+        
         let currentScanId = null;
+        let allAssets = [];
         let riskChart = null;
+        let riskScoreChart = null;
         let moscaChart = null;
+        let scanPollInterval = null;
 
+        // Tab navigation
         document.querySelectorAll(".nav button").forEach(btn => {
             btn.addEventListener("click", () => {
                 document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
@@ -174,22 +269,49 @@
                 document.getElementById(btn.dataset.tab).classList.add("active");
                 if (btn.dataset.tab === "dashboard") loadDashboard();
                 if (btn.dataset.tab === "assets") loadAssets();
+                if (btn.dataset.tab === "risk") loadRisk();
                 if (btn.dataset.tab === "recommendations") loadRecommendations();
+                if (btn.dataset.tab === "export") loadExport();
             });
         });
 
+        // Scan type toggle
         document.getElementById("targetType").addEventListener("change", (e) => {
             document.getElementById("dirGroup").classList.toggle("hidden", e.target.value !== "directory");
             document.getElementById("zipGroup").classList.toggle("hidden", e.target.value !== "zip");
         });
 
+        // Helper: show/hide states
+        function showState(tab, state) {
+            const states = ['Loading', 'Empty', 'Error', 'Content'];
+            states.forEach(s => {
+                const el = document.getElementById(`${tab}${s}`);
+                if (el) el.classList.toggle('hidden', s !== state);
+            });
+        }
+
+        function setError(tab, message) {
+            const el = document.getElementById(`${tab}Error`);
+            if (el) {
+                el.textContent = message;
+                el.classList.remove('hidden');
+            }
+        }
+
+        // SCAN FORM SUBMIT
         document.getElementById("scanForm").addEventListener("submit", async (e) => {
             e.preventDefault();
             const btn = document.getElementById("scanBtn");
-            const progress = document.getElementById("scanProgress");
+            const progress = document.getElementById("scanProgressBar");
+            const statusContainer = document.getElementById("scanStatusContainer");
+            const statusEl = document.getElementById("scanStatus");
+            const statusText = document.getElementById("scanStatusText");
+            const resultEl = document.getElementById("scanResult");
+            
             btn.disabled = true;
-            btn.textContent = "Scanning...";
-            progress.classList.remove("hidden");
+            btn.textContent = "Starting...";
+            statusContainer.classList.remove("hidden");
+            resultEl.innerHTML = "";
 
             const formData = new FormData();
             formData.append("projectName", document.getElementById("projectName").value);
@@ -203,35 +325,88 @@
             try {
                 const res = await fetch(`${API_BASE}/scans`, { method: "POST", body: formData });
                 const data = await res.json();
-                if (data.success) {
-                    currentScanId = data.data.scanId;
-                    document.getElementById("scanResult").innerHTML = `<p style="color: green;">Scan completed! Found ${data.data.summary.totalAssets} assets.</p>`;
-                    loadDashboard();
-                } else {
-                    document.getElementById("scanResult").innerHTML = `<p style="color: red;">Error: ${data.error}</p>`;
-                }
+                if (!data.success) throw new Error(data.error || "Failed to start scan");
+                
+                currentScanId = data.data.scanId;
+                statusText.textContent = data.data.status || "queued";
+                statusEl.className = `scan-status ${data.data.status || "queued"}`;
+                progress.style.width = "10%";
+                
+                // Start polling
+                pollScanStatus(currentScanId);
+                
             } catch (err) {
-                document.getElementById("scanResult").innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
-            } finally {
+                resultEl.innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
+                statusContainer.classList.add("hidden");
                 btn.disabled = false;
                 btn.textContent = "Start Scan";
-                progress.classList.add("hidden");
             }
         });
 
+        async function pollScanStatus(scanId) {
+            const btn = document.getElementById("scanBtn");
+            const progress = document.getElementById("scanProgressBar");
+            const statusEl = document.getElementById("scanStatus");
+            const statusText = document.getElementById("scanStatusText");
+            const resultEl = document.getElementById("scanResult");
+
+            if (scanPollInterval) clearInterval(scanPollInterval);
+            
+            scanPollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/scans/${scanId}`);
+                    const data = await res.json();
+                    if (!data.success) throw new Error(data.error || "Failed to get scan status");
+                    
+                    const scan = data.data;
+                    statusText.textContent = scan.status;
+                    statusEl.className = `scan-status ${scan.status}`;
+                    
+                    if (scan.status === "completed") {
+                        progress.style.width = "100%";
+                        clearInterval(scanPollInterval);
+                        resultEl.innerHTML = `<p style="color: green;">Scan completed! Found ${scan.summary.totalAssets} assets.</p>`;
+                        btn.disabled = false;
+                        btn.textContent = "Start Scan";
+                        loadDashboard();
+                    } else if (scan.status === "running") {
+                        progress.style.width = "50%";
+                    } else if (scan.status === "failed") {
+                        progress.style.width = "100%";
+                        clearInterval(scanPollInterval);
+                        resultEl.innerHTML = `<p style="color: red;">Scan failed.</p>`;
+                        btn.disabled = false;
+                        btn.textContent = "Start Scan";
+                    }
+                } catch (err) {
+                    console.error("Poll error:", err);
+                }
+            }, 2000);
+        }
+
+        // DASHBOARD
         async function loadDashboard() {
+            showState('dashboard', 'Loading');
             try {
                 const res = await fetch(`${API_BASE}/scans`);
                 const data = await res.json();
-                if (!data.success || !data.data.length) return;
+                if (!data.success) throw new Error(data.error || "Failed to load scans");
+                
+                if (!data.data || !data.data.length) {
+                    showState('dashboard', 'Empty');
+                    return;
+                }
+                
                 const scan = data.data[0];
                 currentScanId = scan._id;
+                
                 document.getElementById("stat-critical").textContent = scan.summary.critical;
                 document.getElementById("stat-high").textContent = scan.summary.high;
                 document.getElementById("stat-medium").textContent = scan.summary.medium;
                 document.getElementById("stat-low").textContent = scan.summary.low;
                 document.getElementById("stat-safe").textContent = scan.summary.quantumSafeCount;
                 document.getElementById("stat-total").textContent = scan.summary.totalAssets;
+                document.getElementById("latestScanInfo").textContent = `${scan.projectName} (${new Date(scan.createdAt).toLocaleString()})`;
 
                 if (riskChart) riskChart.destroy();
                 const ctx = document.getElementById("riskChart").getContext("2d");
@@ -246,84 +421,216 @@
                     },
                     options: { responsive: true, plugins: { legend: { position: "bottom" } } }
                 });
+                
+                showState('dashboard', 'Content');
             } catch (err) {
-                console.error(err);
+                setError('dashboard', err.message);
+                showState('dashboard', 'Error');
             }
         }
 
+        // ASSETS
         async function loadAssets() {
-            if (!currentScanId) return;
+            if (!currentScanId) {
+                showState('assets', 'Empty');
+                return;
+            }
+            showState('assets', 'Loading');
             try {
                 const res = await fetch(`${API_BASE}/scans/${currentScanId}/assets`);
                 const data = await res.json();
-                if (!data.success) return;
-                const tbody = document.querySelector("#assetsTable tbody");
-                tbody.innerHTML = data.data.assets.map(a => `
-                    <tr>
-                        <td>${a.algorithm}</td>
-                        <td>${a.filePath}</td>
-                        <td>${a.lineNumber}</td>
-                        <td>${a.language}</td>
-                        <td><span class="badge ${a.quantumRisk}">${a.quantumRisk}</span></td>
-                        <td>${a.riskScore}</td>
-                        <td>${a.moscaUrgent ? "Yes" : "No"}</td>
-                        <td>${a.recommendation}</td>
-                    </tr>
-                `).join("");
+                if (!data.success) throw new Error(data.error || "Failed to load assets");
+                
+                allAssets = data.data.assets || [];
+                renderAssetsTable(allAssets);
+                showState('assets', 'Content');
             } catch (err) {
-                console.error(err);
+                setError('assets', err.message);
+                showState('assets', 'Error');
             }
         }
 
-        document.getElementById("assetSearch").addEventListener("input", loadAssets);
-        document.getElementById("riskFilter").addEventListener("change", loadAssets);
+        function renderAssetsTable(assets) {
+            const tbody = document.querySelector("#assetsTable tbody");
+            const countEl = document.getElementById("assetsCount");
+            tbody.innerHTML = assets.map(a => `
+                <tr>
+                    <td>${escapeHtml(a.algorithm)}</td>
+                    <td>${escapeHtml(a.filePath)}</td>
+                    <td>${a.lineNumber}</td>
+                    <td>${escapeHtml(a.language)}</td>
+                    <td><span class="badge ${a.quantumRisk}">${a.quantumRisk}</span></td>
+                    <td>${a.riskScore}</td>
+                    <td>${a.moscaUrgent ? "Yes" : "No"}</td>
+                    <td>${escapeHtml(a.recommendation || "")}</td>
+                </tr>
+            `).join("");
+            countEl.textContent = `${assets.length} asset(s)`;
+        }
 
-        async function loadRecommendations() {
-            if (!currentScanId) return;
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        document.getElementById("assetSearch").addEventListener("input", filterAssets);
+        document.getElementById("riskFilter").addEventListener("change", filterAssets);
+        document.getElementById("languageFilter").addEventListener("change", filterAssets);
+
+        function filterAssets() {
+            const search = document.getElementById("assetSearch").value.toLowerCase();
+            const risk = document.getElementById("riskFilter").value;
+            const lang = document.getElementById("languageFilter").value;
+            
+            const filtered = allAssets.filter(a => {
+                if (search && !`${a.algorithm} ${a.filePath} ${a.language}`.toLowerCase().includes(search)) return false;
+                if (risk && a.quantumRisk !== risk) return false;
+                if (lang && a.language !== lang) return false;
+                return true;
+            });
+            renderAssetsTable(filtered);
+        }
+
+        // RISK
+        async function loadRisk() {
+            if (!currentScanId) {
+                showState('risk', 'Empty');
+                return;
+            }
+            showState('risk', 'Loading');
             try {
                 const res = await fetch(`${API_BASE}/scans/${currentScanId}/assets`);
                 const data = await res.json();
-                if (!data.success) return;
-                const tbody = document.querySelector("#recTable tbody");
-                const seen = new Set();
-                tbody.innerHTML = data.data.assets
-                    .filter(a => {
-                        if (seen.has(a.algorithm)) return false;
-                        seen.add(a.algorithm);
-                        return true;
-                    })
-                    .map(a => `
-                        <tr>
-                            <td>${a.algorithm}</td>
-                            <td><span class="badge ${a.quantumRisk}">${a.quantumRisk}</span></td>
-                            <td>${a.recommendation}</td>
-                            <td>${a.recommendation.includes("FIPS") ? "NIST PQC" : "Best Practice"}</td>
-                        </tr>
-                    `).join("");
+                if (!data.success) throw new Error(data.error || "Failed to load assets");
+                
+                const assets = data.data.assets || [];
+                renderRiskCharts(assets);
+                showState('risk', 'Content');
             } catch (err) {
-                console.error(err);
+                setError('risk', err.message);
+                showState('risk', 'Error');
             }
+        }
+
+        function renderRiskCharts(assets) {
+            // Risk Score Distribution (bar chart)
+            const scoreBuckets = { critical: 0, high: 0, medium: 0, low: 0, safe: 0 };
+            assets.forEach(a => {
+                if (a.riskScore >= 80) scoreBuckets.critical++;
+                else if (a.riskScore >= 60) scoreBuckets.high++;
+                else if (a.riskScore >= 35) scoreBuckets.medium++;
+                else if (a.riskScore > 0) scoreBuckets.low++;
+                else scoreBuckets.safe++;
+            });
+
+            if (riskScoreChart) riskScoreChart.destroy();
+            const ctx1 = document.getElementById("riskScoreChart").getContext("2d");
+            riskScoreChart = new Chart(ctx1, {
+                type: "bar",
+                data: {
+                    labels: ["Critical (80-100)", "High (60-79)", "Medium (35-59)", "Low (1-34)", "Safe (0)"],
+                    datasets: [{
+                        label: "Number of Assets",
+                        data: [scoreBuckets.critical, scoreBuckets.high, scoreBuckets.medium, scoreBuckets.low, scoreBuckets.safe],
+                        backgroundColor: ["#e94560", "#f39c12", "#3498db", "#2ecc71", "#2ecc71"]
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+
+            // Mosca Urgency (pie chart)
+            const urgentCount = assets.filter(a => a.moscaUrgent).length;
+            const notUrgentCount = assets.length - urgentCount;
+
+            if (moscaChart) moscaChart.destroy();
+            const ctx2 = document.getElementById("moscaChart").getContext("2d");
+            moscaChart = new Chart(ctx2, {
+                type: "pie",
+                data: {
+                    labels: ["Mosca Urgent (X+Y>Z)", "Not Urgent"],
+                    datasets: [{
+                        data: [urgentCount, notUrgentCount],
+                        backgroundColor: ["#e94560", "#2ecc71"]
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+            });
+        }
+
+        // RECOMMENDATIONS
+        async function loadRecommendations() {
+            if (!currentScanId) {
+                showState('recommendations', 'Empty');
+                return;
+            }
+            showState('recommendations', 'Loading');
+            try {
+                const res = await fetch(`${API_BASE}/scans/${currentScanId}/assets`);
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || "Failed to load assets");
+                
+                const assets = data.data.assets || [];
+                renderRecommendations(assets);
+                showState('recommendations', 'Content');
+            } catch (err) {
+                setError('recommendations', err.message);
+                showState('recommendations', 'Error');
+            }
+        }
+
+        function renderRecommendations(assets) {
+            const tbody = document.querySelector("#recTable tbody");
+            const seen = new Set();
+            const unique = assets.filter(a => {
+                if (seen.has(a.algorithm)) return false;
+                seen.add(a.algorithm);
+                return true;
+            });
+            
+            tbody.innerHTML = unique.map(a => `
+                <tr>
+                    <td>${escapeHtml(a.algorithm)}</td>
+                    <td><span class="badge ${a.quantumRisk}">${a.quantumRisk}</span></td>
+                    <td>${escapeHtml(a.recommendation || "No recommendation")}</td>
+                    <td>${a.recommendation && a.recommendation.includes("FIPS") ? "NIST PQC" : "Best Practice"}</td>
+                </tr>
+            `).join("");
+        }
+
+        // EXPORT
+        function loadExport() {
+            if (!currentScanId) {
+                showState('export', 'Empty');
+                return;
+            }
+            showState('export', 'Content');
+            document.getElementById("exportInfo").textContent = `Scan ID: ${currentScanId}`;
         }
 
         document.getElementById("downloadCbom").addEventListener("click", async () => {
             if (!currentScanId) return alert("No scan available");
+            showState('export', 'Loading');
             try {
                 const res = await fetch(`${API_BASE}/scans/${currentScanId}/cbom`);
                 const data = await res.json();
-                if (data.success) {
-                    const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `cbom-${currentScanId}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                }
+                if (!data.success) throw new Error(data.error || "Failed to download CBOM");
+                
+                const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `cbom-${currentScanId}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showState('export', 'Content');
             } catch (err) {
-                alert("Error: " + err.message);
+                setError('export', err.message);
+                showState('export', 'Error');
             }
         });
 
+        // Initial load
         loadDashboard();
     </script>
 </body>

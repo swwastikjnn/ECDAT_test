@@ -3,6 +3,7 @@ const multer = require("multer");
 const AdmZip = require("adm-zip");
 const path = require("path");
 const fs = require("fs");
+const mongoose = require("mongoose");
 const Scan = require("../models/Scan");
 const Asset = require("../models/Asset");
 const { callScanner } = require("../services/scannerClient");
@@ -10,6 +11,24 @@ const { callScanner } = require("../services/scannerClient");
 const router = express.Router();
 
 const upload = multer({ dest: "uploads/" });
+
+const settingsSchema = new mongoose.Schema({
+  zAssumptionYears: { type: Number, default: 10 },
+  weightQuantum: { type: Number, default: 0.40 },
+  weightBusiness: { type: Number, default: 0.30 },
+  weightMosca: { type: Number, default: 0.20 },
+  weightExpiry: { type: Number, default: 0.10 }
+});
+
+const Settings = mongoose.model("Settings", settingsSchema);
+
+async function getSettings() {
+  let settings = await Settings.findOne();
+  if (!settings) {
+    settings = await Settings.create({});
+  }
+  return settings;
+}
 
 function sendResponse(res, success, data, error = null, status = 200) {
   res.status(status).json({ success, data, error });
@@ -37,7 +56,16 @@ router.post("/", upload.single("zipFile"), async (req, res) => {
     });
     await scan.save();
 
-    const scannerResult = await callScanner(targetPath);
+    const settings = await getSettings();
+    const scannerSettings = {
+      z_years: settings.zAssumptionYears,
+      weight_quantum: settings.weightQuantum,
+      weight_business: settings.weightBusiness,
+      weight_mosca: settings.weightMosca,
+      weight_expiry: settings.weightExpiry
+    };
+
+    const scannerResult = await callScanner(targetPath, scannerSettings);
 
     const assets = scannerResult.assets.map(a => ({
       scanId: scan._id,

@@ -22,6 +22,13 @@ curl -X POST http://localhost:8000/scan \
   -d '{"target_path": "./scanner/sample-vulnerable-app"}'
 ```
 
+### Step 2b — Run the contract test with optional live settings
+```bash
+curl -X POST http://localhost:8000/scan \
+  -H "Content-Type: application/json" \
+  -d '{"target_path": "./scanner/sample-vulnerable-app", "z_years": 10, "weight_quantum": 0.40, "weight_business": 0.30, "weight_mosca": 0.20, "weight_expiry": 0.10}'
+```
+
 ### Step 3 — Check the response shape
 The response MUST contain all of these fields. If any are missing, the contract is broken.
 
@@ -68,7 +75,57 @@ git push origin feature/your-branch-name
 ```
 
 ---
-
+ 
+## CONTRACT 1 — PYTHON SCANNER ENDPOINT
+ 
+```
+POST http://localhost:8000/scan
+Content-Type: application/json
+ 
+Request body:
+{
+  "target_path": "/absolute/path/to/code/folder",
+  "z_years": 10,
+  "weight_quantum": 0.40,
+  "weight_business": 0.30,
+  "weight_mosca": 0.20,
+  "weight_expiry": 0.10
+}
+ 
+All settings fields are optional. Defaults match the hardcoded values used before this change.
+If omitted, the scanner uses: z_years=10, weight_quantum=0.40, weight_business=0.30, weight_mosca=0.20, weight_expiry=0.10
+ 
+Response (200 OK):
+{
+  "assets": [
+    {
+      "algorithm":            "RSA-2048",
+      "file_path":            "src/auth/Login.java",
+      "line_number":          42,
+      "language":             "java",
+      "asset_type":           "algorithm",
+      "quantum_risk":         "critical",
+      "mosca_urgent":         true,
+      "risk_score":           85,
+      "recommendation":       "Replace with ML-KEM (FIPS 203)",
+      "business_criticality": "medium"
+    }
+  ],
+  "cbom_json": { ... },
+  "summary": {
+    "totalAssets":           12,
+    "critical":              4,
+    "high":                  3,
+    "medium":                3,
+    "low":                   2,
+    "quantumSafeCount":      2,
+    "quantumVulnerableCount": 10
+  }
+}
+```
+ 
+---
+ 
 ## PORTS — LOCKED. NEVER CHANGE.
 
 | Service | Port |

@@ -2,10 +2,11 @@ const axios = require("axios");
 
 const SCANNER_URL = process.env.SCANNER_URL || "http://localhost:8000";
 
-async function callScanner(targetPath) {
+async function callScanner(targetPath, settings = {}) {
   try {
     const response = await axios.post(`${SCANNER_URL}/scan`, {
-      target_path: targetPath
+      target_path: targetPath,
+      ...settings
     }, {
       timeout: 300000
     });
